@@ -27,6 +27,7 @@ export type AgentCycleRequest = {
 
 export type MarketFeature = {
   symbol: string
+  venue?: string
   spread_pct?: number
   mid?: number
   return_5s_pct?: number
