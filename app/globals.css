@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-space-grotesk), 'Space Grotesk Fallback';
+  --font-heading: var(--font-inter), 'Inter Fallback';
   --font-sans: var(--font-inter), 'Inter Fallback';
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono Fallback';
 
@@ -27,7 +27,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* xZro palette */
+  /* xZro palette (minimal dark neutral + subtle blue) */
   --color-xbg: var(--xzro-bg);
   --color-xbg-elevated: var(--xzro-bg-elevated);
   --color-xpanel: var(--xzro-panel);
@@ -58,30 +58,30 @@
 :root {
   color-scheme: dark;
 
-  --xzro-bg: #050807;
-  --xzro-bg-elevated: #0a0f0d;
-  --xzro-panel: #0d1512;
-  --xzro-panel-2: #111b17;
-  --xzro-border: rgba(163, 255, 196, 0.14);
-  --xzro-border-strong: rgba(163, 255, 196, 0.26);
+  --xzro-bg: #0a0a0b;
+  --xzro-bg-elevated: #101013;
+  --xzro-panel: #121214;
+  --xzro-panel-2: #18181c;
+  --xzro-border: rgba(255, 255, 255, 0.08);
+  --xzro-border-strong: rgba(255, 255, 255, 0.16);
 
-  --xzro-text: #f2fff7;
-  --xzro-text-muted: #8fa99a;
-  --xzro-text-soft: #c8d9d0;
+  --xzro-text: #f4f4f5;
+  --xzro-text-muted: #8b8b93;
+  --xzro-text-soft: #c2c2c9;
 
-  --xzro-accent: #9dffb3;
-  --xzro-accent-strong: #63ff8f;
-  --xzro-accent-deep: #00d66b;
-  --xzro-cyan: #84f5ff;
-  --xzro-violet: #a78bfa;
+  --xzro-accent: #93b4ff;
+  --xzro-accent-strong: #5b8def;
+  --xzro-accent-deep: #3b6fd4;
+  --xzro-cyan: #6fb3e8;
+  --xzro-violet: #9b8bf4;
 
-  --xzro-danger: #ff5c7a;
-  --xzro-warning: #ffd166;
-  --xzro-success: #63ff8f;
-  --xzro-neutral: #9ca3af;
+  --xzro-danger: #ef6f7b;
+  --xzro-warning: #e0b34d;
+  --xzro-success: #5cbf86;
+  --xzro-neutral: #9a9aa2;
 
-  --xzro-glow-soft: 0 0 60px rgba(99, 255, 143, 0.1);
-  --xzro-glow-card: 0 0 0 1px rgba(163, 255, 196, 0.12), 0 24px 80px rgba(0, 0, 0, 0.35);
+  --xzro-glow-soft: none;
+  --xzro-glow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 24px rgba(0, 0, 0, 0.3);
 
   /* semantic token mapping (dark, single theme) */
   --background: var(--xzro-bg);
@@ -91,7 +91,7 @@
   --popover: var(--xzro-panel-2);
   --popover-foreground: var(--xzro-text);
   --primary: var(--xzro-accent-strong);
-  --primary-foreground: #04140a;
+  --primary-foreground: #0a0a0b;
   --secondary: var(--xzro-panel-2);
   --secondary-foreground: var(--xzro-text);
   --muted: var(--xzro-panel-2);
@@ -103,7 +103,7 @@
   --input: var(--xzro-border-strong);
   --ring: var(--xzro-accent-strong);
 
-  --radius: 0.875rem;
+  --radius: 0.625rem;
 }
 
 @layer base {
@@ -112,10 +112,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(circle at 80% 0%, rgba(99, 255, 143, 0.12), transparent 34rem),
-      radial-gradient(circle at 20% 20%, rgba(132, 245, 255, 0.06), transparent 28rem);
-    background-attachment: fixed;
   }
   html {
     @apply font-sans;
@@ -125,7 +121,7 @@
   }
 }
 
-/* Subtle grid overlay */
+/* Minimal grid overlay (very subtle, neutral) */
 .grid-bg::before {
   content: '';
   position: fixed;
@@ -133,21 +129,20 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(157, 255, 179, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(157, 255, 179, 0.045) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: linear-gradient(to bottom, black, transparent 75%);
-  mask-image: linear-gradient(to bottom, black, transparent 75%);
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 80%);
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
 }
 
 .x-panel {
-  background: linear-gradient(180deg, rgba(17, 27, 23, 0.92), rgba(8, 13, 11, 0.92));
+  background: var(--xzro-panel);
   border: 1px solid var(--xzro-border);
-  backdrop-filter: blur(16px);
 }
 
 .x-glow {
-  box-shadow: var(--xzro-glow-soft);
+  box-shadow: none;
 }
 
 /* Custom scrollbar for code blocks */

@@ -15,10 +15,10 @@ import {
 } from 'recharts'
 import type { MarketFeature } from '@/lib/types'
 
-const axisStyle = { fontSize: 11, fill: '#8fa99a' }
-const gridColor = 'rgba(163, 255, 196, 0.14)'
-const ACCENT = '#63ff8f'
-const DANGER = '#ff5c7a'
+const axisStyle = { fontSize: 11, fill: '#8b8b93' }
+const gridColor = 'rgba(255, 255, 255, 0.08)'
+const ACCENT = '#5b8def'
+const DANGER = '#ef6f7b'
 
 function ChartTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
@@ -55,7 +55,7 @@ export function LiquiditySpreadScatter({ features }: { features: MarketFeature[]
           tick={axisStyle}
           tickLine={false}
           axisLine={{ stroke: gridColor }}
-          label={{ value: 'Liquidity score', position: 'insideBottom', offset: -14, fill: 'oklch(0.62 0.02 240)', fontSize: 11 }}
+          label={{ value: 'Liquidity score', position: 'insideBottom', offset: -14, fill: '#8b8b93', fontSize: 11 }}
         />
         <YAxis
           type="number"
@@ -94,7 +94,7 @@ export function ObiBarChart({ features }: { features: MarketFeature[] }) {
           interval={0}
         />
         <YAxis tick={axisStyle} tickLine={false} axisLine={{ stroke: gridColor }} />
-        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(163, 255, 196, 0.06)' }} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }} />
         <Bar dataKey="order_book_imbalance_l5" radius={[3, 3, 0, 0]}>
           {data.map((d) => (
             <Cell

@@ -1,12 +1,8 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
-const spaceGrotesk = Space_Grotesk({
-  variable: '--font-space-grotesk',
-  subsets: ['latin'],
-})
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] })
 const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains-mono',
@@ -22,7 +18,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#050807',
+  themeColor: '#0a0a0b',
 }
 
 export default function RootLayout({
@@ -33,7 +29,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body className="font-sans antialiased bg-background text-foreground">
         {children}
