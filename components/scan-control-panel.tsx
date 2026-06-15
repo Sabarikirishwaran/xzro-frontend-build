@@ -8,18 +8,20 @@ export function ScanControlPanel({
   onBudgetChange,
   runState,
   hasResult,
+  disabled,
   onRun,
 }: {
   budget: number
   onBudgetChange: (value: number) => void
   runState: 'idle' | 'loading' | 'success'
   hasResult: boolean
+  disabled: boolean
   onRun: () => void
 }) {
   const loading = runState === 'loading'
   const primaryLabel =
     runState === 'loading'
-      ? 'Scanning market state…'
+      ? 'Scanning market state...'
       : runState === 'success'
         ? 'Decision ready'
         : hasResult
@@ -65,7 +67,7 @@ export function ScanControlPanel({
         <button
           type="button"
           onClick={onRun}
-          disabled={loading}
+          disabled={loading || disabled}
           className={`${primaryButtonClass} w-full`}
         >
           {loading && <LoaderCircle className="size-4 animate-spin" />}

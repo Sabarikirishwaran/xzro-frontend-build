@@ -1,37 +1,75 @@
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import {
+  jsonNoStore,
+  protectHealthEndpoint,
+} from '@/lib/server/xzro-api-protection'
 
-export async function GET() {
-  const backendUrl = process.env.XZRO_BACKEND_URL
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const BACKEND_TIMEOUT_MS = 8_000
+
+function getBackendConfig() {
+  const rawUrl = process.env.XZRO_BACKEND_URL
   const apiKey = process.env.XZRO_BACKEND_API_KEY
 
-  if (!backendUrl || !apiKey) {
-    return NextResponse.json(
-      { error: 'Service configuration missing' },
-      { status: 500 },
+  if (!rawUrl || !apiKey) return null
+
+  try {
+    const url = new URL(rawUrl)
+    if (
+      url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      return null
+    }
+
+    return { apiKey, url: url.toString().replace(/\/$/, '') }
+  } catch {
+    return null
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const blocked = await protectHealthEndpoint(req)
+  if (blocked) return blocked
+
+  const backend = getBackendConfig()
+  if (!backend) {
+    return jsonNoStore(
+      {
+        error: 'Service temporarily unavailable.',
+        code: 'service_unavailable',
+      },
+      { status: 503 },
     )
   }
 
   try {
-    const res = await fetch(`${backendUrl.replace(/\/$/, '')}/api/health`, {
+    const res = await fetch(`${backend.url}/api/health`, {
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+        Authorization: `Bearer ${backend.apiKey}`,
       },
       cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
     })
 
-    const text = await res.text()
-
-    try {
-      return NextResponse.json(JSON.parse(text), { status: res.status })
-    } catch {
-      return NextResponse.json(
-        { error: 'Service returned an unexpected response', raw: text },
-        { status: res.status },
+    if (!res.ok) {
+      return jsonNoStore(
+        { error: 'Service unavailable.', code: 'upstream_unavailable' },
+        { status: 503 },
       )
     }
-  } catch (err) {
-    return NextResponse.json(
-      { error: 'Service unavailable' },
+
+    return jsonNoStore({ ok: true })
+  } catch {
+    return jsonNoStore(
+      { error: 'Service unavailable.', code: 'upstream_unavailable' },
       { status: 503 },
     )
   }

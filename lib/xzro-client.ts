@@ -1,34 +1,53 @@
-import type { XzroCycleRequest, XzroCycleResponse } from './types'
+import type { XzroCycleResponse } from './types'
 
 export class XzroRequestError extends Error {
+  code?: string
   status: number
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'XzroRequestError'
     this.status = status
+    this.code = code
   }
 }
 
-async function parseResponse(res: Response) {
+type ApiEnvelope = {
+  authenticated?: boolean
+  code?: string
+  error?: string
+  required?: boolean
+  [key: string]: unknown
+}
+
+export type XzroAccessStatus = {
+  authenticated: boolean
+  required: boolean
+}
+
+async function parseResponse(res: Response): Promise<ApiEnvelope | null> {
   const text = await res.text()
 
   if (!text) return null
 
   try {
-    return JSON.parse(text)
+    return JSON.parse(text) as ApiEnvelope
   } catch {
     return { error: 'Unexpected service response.' }
   }
 }
 
 export async function runXzroCycle(
-  payload: XzroCycleRequest,
+  budget: number,
 ): Promise<XzroCycleResponse> {
   const res = await fetch('/api/xzro/cycle', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ portfolio_budget_usd: budget }),
   })
   const data = await parseResponse(res)
 
@@ -38,24 +57,60 @@ export async function runXzroCycle(
         ? 'Market scan timed out.'
         : 'The scan could not be completed.',
       res.status,
+      data?.code,
     )
   }
 
   return (data ?? {}) as XzroCycleResponse
 }
 
-export function buildHyperliquidPayload(
-  budget = 100,
-): XzroCycleRequest {
+export async function getXzroAccessStatus(): Promise<XzroAccessStatus> {
+  const res = await fetch('/api/xzro/session', {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  })
+  const data = await parseResponse(res)
+
+  if (!res.ok) {
+    throw new XzroRequestError(
+      'Access status could not be checked.',
+      res.status,
+      data?.code,
+    )
+  }
+
   return {
-    venue: 'hyperliquid',
-    use_all_venue_symbols: true,
-    hyperliquid_universe_max_symbols: 8,
-    max_symbols_deep_analysis: 8,
-    horizon_minutes: [30],
-    portfolio_budget_usd: budget,
-    include_raw_books: false,
-    use_mock_on_error: true,
+    authenticated: data?.authenticated === true,
+    required: data?.required === true,
+  }
+}
+
+export async function createXzroSession(
+  accessCode: string,
+): Promise<XzroAccessStatus> {
+  const res = await fetch('/api/xzro/session', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ accessCode }),
+  })
+  const data = await parseResponse(res)
+
+  if (!res.ok) {
+    throw new XzroRequestError(
+      'Access could not be verified.',
+      res.status,
+      data?.code,
+    )
+  }
+
+  return {
+    authenticated: data?.authenticated === true,
+    required: data?.required === true,
   }
 }
 

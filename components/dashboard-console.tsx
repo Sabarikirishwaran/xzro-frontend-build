@@ -3,15 +3,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CandidateTable } from './candidate-table'
 import { DecisionSummary } from './decision-summary'
-import { EmptyState, LoadingState } from './dashboard-states'
+import {
+  AccessState,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from './dashboard-states'
 import { FeatureTable } from './feature-table'
 import { GateSummary } from './gate-summary'
 import { ScanControlPanel } from './scan-control-panel'
 import { normalizeXzroResult } from '@/lib/normalize-xzro'
 import {
-  buildHyperliquidPayload,
   buildLocalSafeResult,
+  createXzroSession,
+  getXzroAccessStatus,
   runXzroCycle,
+  XzroRequestError,
 } from '@/lib/xzro-client'
 import type {
   NormalizedResult,
@@ -27,11 +34,19 @@ type StoredResult = {
   timestamp: string
 }
 
+type AccessStateValue = 'checking' | 'granted' | 'required' | 'unavailable'
+
 export function DashboardConsole() {
   const [budget, setBudget] = useState(100)
   const [runState, setRunState] = useState<'idle' | 'loading' | 'success'>('idle')
   const [slow, setSlow] = useState(false)
   const [result, setResult] = useState<NormalizedResult | null>(null)
+  const [accessState, setAccessState] =
+    useState<AccessStateValue>('checking')
+  const [accessCode, setAccessCode] = useState('')
+  const [accessError, setAccessError] = useState<string | null>(null)
+  const [accessLoading, setAccessLoading] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -43,6 +58,23 @@ export function DashboardConsole() {
       window.localStorage.removeItem(STORAGE_KEY)
     }
   }, [])
+
+  const refreshAccessStatus = useCallback(async () => {
+    setAccessState('checking')
+
+    try {
+      const status = await getXzroAccessStatus()
+      setAccessState(
+        status.required && !status.authenticated ? 'required' : 'granted',
+      )
+    } catch {
+      setAccessState('unavailable')
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshAccessStatus()
+  }, [refreshAccessStatus])
 
   useEffect(() => {
     if (runState !== 'loading') {
@@ -59,6 +91,7 @@ export function DashboardConsole() {
       const timestamp = new Date()
       setResult(normalizeXzroResult(response, requestedVenue))
       setRunState('success')
+      setScanError(null)
 
       try {
         const stored: StoredResult = {
@@ -77,15 +110,62 @@ export function DashboardConsole() {
   )
 
   const executeScan = useCallback(async () => {
+    if (accessState !== 'granted') return
+
     setRunState('loading')
+    setScanError(null)
 
     try {
-      const response = await runXzroCycle(buildHyperliquidPayload(budget))
+      const response = await runXzroCycle(budget)
       commitResult(response, 'hyperliquid')
-    } catch {
+    } catch (error) {
+      setRunState('idle')
+
+      if (error instanceof XzroRequestError) {
+        if (error.code === 'access_required') {
+          setAccessState('required')
+          setAccessCode('')
+          return
+        }
+
+        if (error.code === 'rate_limited') {
+          setScanError('Request limit reached. Please wait before trying again.')
+          return
+        }
+
+        if (error.code !== 'upstream_unavailable') {
+          setScanError('The scan is temporarily unavailable. Please try again.')
+          return
+        }
+      }
+
       commitResult(buildLocalSafeResult(), 'mock')
     }
-  }, [budget, commitResult])
+  }, [accessState, budget, commitResult])
+
+  const submitAccessCode = useCallback(async () => {
+    if (!accessCode || accessLoading) return
+
+    setAccessLoading(true)
+    setAccessError(null)
+
+    try {
+      const status = await createXzroSession(accessCode)
+      setAccessCode('')
+      setAccessState(status.authenticated ? 'granted' : 'required')
+    } catch (error) {
+      if (
+        error instanceof XzroRequestError &&
+        error.code === 'rate_limited'
+      ) {
+        setAccessError('Too many attempts. Please wait before trying again.')
+      } else {
+        setAccessError('The access code could not be verified.')
+      }
+    } finally {
+      setAccessLoading(false)
+    }
+  }, [accessCode, accessLoading])
 
   return (
     <div className="fade-in mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-14">
@@ -109,13 +189,31 @@ export function DashboardConsole() {
             onBudgetChange={setBudget}
             runState={runState}
             hasResult={!!result}
+            disabled={accessState !== 'granted'}
             onRun={executeScan}
           />
         </aside>
 
         <section aria-live="polite" className="min-w-0">
-          {runState === 'loading' ? (
+          {accessState === 'unavailable' ? (
+            <ErrorState
+              message="The strategy console is temporarily unavailable."
+              onRetry={refreshAccessStatus}
+            />
+          ) : accessState === 'required' ? (
+            <AccessState
+              accessCode={accessCode}
+              error={accessError}
+              loading={accessLoading}
+              onAccessCodeChange={setAccessCode}
+              onSubmit={submitAccessCode}
+            />
+          ) : accessState === 'checking' ? (
+            <LoadingState slow={false} />
+          ) : runState === 'loading' ? (
             <LoadingState slow={slow} />
+          ) : scanError ? (
+            <ErrorState message={scanError} onRetry={executeScan} />
           ) : result ? (
             <div className="result-in space-y-5">
               <DecisionSummary result={result} />
