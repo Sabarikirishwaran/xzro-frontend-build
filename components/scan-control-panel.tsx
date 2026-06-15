@@ -1,48 +1,22 @@
 'use client'
 
-import { ChevronDown, LoaderCircle } from 'lucide-react'
-import type { HealthState, VenueMode } from '@/lib/types'
-import {
-  Panel,
-  PanelHeader,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from './ui'
-import { cn } from '@/lib/utils'
+import { LoaderCircle } from 'lucide-react'
+import { Panel, PanelHeader, primaryButtonClass } from './ui'
 
 export function ScanControlPanel({
-  venueMode,
-  onVenueModeChange,
   budget,
   onBudgetChange,
-  includeRawBooks,
-  onIncludeRawBooksChange,
-  useFallback,
-  onUseFallbackChange,
-  healthState,
   runState,
   hasResult,
   onRun,
-  onRunSafe,
 }: {
-  venueMode: VenueMode
-  onVenueModeChange: (value: VenueMode) => void
   budget: number
   onBudgetChange: (value: number) => void
-  includeRawBooks: boolean
-  onIncludeRawBooksChange: (value: boolean) => void
-  useFallback: boolean
-  onUseFallbackChange: (value: boolean) => void
-  healthState: HealthState
   runState: 'idle' | 'loading' | 'success'
   hasResult: boolean
   onRun: () => void
-  onRunSafe: () => void
 }) {
   const loading = runState === 'loading'
-  const primaryDisabled =
-    loading || healthState === 'checking' || healthState === 'offline' || healthState === 'auth_error'
-
   const primaryLabel =
     runState === 'loading'
       ? 'Scanning market state…'
@@ -56,58 +30,23 @@ export function ScanControlPanel({
     <Panel>
       <PanelHeader
         title="Scan setup"
-        description="Fast venue scan with a fixed 30-minute horizon."
+        description="Market scan configured for a 30-minute decision horizon."
       />
 
       <div className="space-y-6 p-5">
-        <fieldset>
-          <legend className="text-xs font-medium text-text-secondary">
-            Venue mode
-          </legend>
-          <div
-            className="mt-2 grid grid-cols-2 rounded-xl border border-border-subtle bg-surface-1 p-1"
-            role="group"
-            aria-label="Venue mode"
-          >
-            {[
-              ['hyperliquid', 'Hyperliquid'],
-              ['mock', 'Safe sample'],
-            ].map(([value, label]) => {
-              const active = venueMode === value
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onVenueModeChange(value as VenueMode)}
-                  className={cn(
-                    'rounded-lg px-3 py-2 text-xs font-medium transition',
-                    active
-                      ? 'bg-white/[0.075] text-text-primary'
-                      : 'text-text-muted hover:text-text-secondary',
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
-
         <div className="grid grid-cols-2 gap-3">
+          <ReadOnlyField label="Market" value="Hyperliquid" />
+          <ReadOnlyField label="Universe" value="Top 8" />
           <ReadOnlyField label="Horizon" value="30m" />
-          <ReadOnlyField
-            label="Symbols"
-            value={venueMode === 'mock' ? 'Fixed 3' : 'Auto top 8'}
-          />
+          <ReadOnlyField label="Analysis" value="Cost + risk" />
         </div>
 
         <label className="block">
           <span className="text-xs font-medium text-text-secondary">
-            Budget
+            Portfolio budget
           </span>
           <div className="mt-2 flex items-center rounded-xl border border-border-subtle bg-surface-1 px-3">
-            <span className="text-sm text-text-muted">$</span>
+            <span className="text-sm text-text-secondary">$</span>
             <input
               type="number"
               min={10}
@@ -123,48 +62,15 @@ export function ScanControlPanel({
           </div>
         </label>
 
-        <details className="group border-y border-border-subtle py-1">
-          <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-xs font-medium text-text-secondary">
-            Advanced
-            <ChevronDown className="size-3.5 text-text-muted transition group-open:rotate-180" />
-          </summary>
-          <div className="space-y-4 pb-4">
-            <Toggle
-              label="Include raw books"
-              checked={includeRawBooks}
-              onChange={onIncludeRawBooksChange}
-            />
-            <Toggle
-              label="Use fallback on error"
-              checked={useFallback}
-              onChange={onUseFallbackChange}
-            />
-          </div>
-        </details>
-
-        <div className="space-y-2.5">
-          <button
-            type="button"
-            onClick={onRun}
-            disabled={primaryDisabled}
-            className={`${primaryButtonClass} w-full`}
-          >
-            {loading && <LoaderCircle className="size-4 animate-spin" />}
-            {primaryLabel}
-          </button>
-          <button
-            type="button"
-            onClick={onRunSafe}
-            disabled={loading}
-            className={`${secondaryButtonClass} w-full`}
-          >
-            Run safe sample
-          </button>
-        </div>
-
-        <p className="text-center text-[11px] text-text-muted">
-          No live execution.
-        </p>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={loading}
+          className={`${primaryButtonClass} w-full`}
+        >
+          {loading && <LoaderCircle className="size-4 animate-spin" />}
+          {primaryLabel}
+        </button>
       </div>
     </Panel>
   )
@@ -173,31 +79,8 @@ export function ScanControlPanel({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border-subtle bg-surface-1 px-3 py-2.5">
-      <p className="text-[11px] text-text-muted">{label}</p>
-      <p className="mono-number mt-1 text-xs text-text-secondary">{value}</p>
+      <p className="text-[11px] text-text-secondary">{label}</p>
+      <p className="mono-number mt-1 text-xs text-text-primary">{value}</p>
     </div>
-  )
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: (value: boolean) => void
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-4">
-      <span className="text-xs text-text-secondary">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="peer sr-only"
-      />
-      <span className="relative h-5 w-9 rounded-full border border-border-strong bg-surface-3 transition after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:bg-text-muted after:content-[''] after:transition peer-checked:border-accent-border peer-checked:bg-accent-soft peer-checked:after:translate-x-4 peer-checked:after:bg-accent" />
-    </label>
   )
 }

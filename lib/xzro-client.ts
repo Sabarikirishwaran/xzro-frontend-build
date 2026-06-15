@@ -1,18 +1,12 @@
-import type {
-  XzroCycleRequest,
-  XzroCycleResponse,
-  XzroHealth,
-} from './types'
+import type { XzroCycleRequest, XzroCycleResponse } from './types'
 
 export class XzroRequestError extends Error {
   status: number
-  details: unknown
 
-  constructor(message: string, status: number, details?: unknown) {
+  constructor(message: string, status: number) {
     super(message)
     this.name = 'XzroRequestError'
     this.status = status
-    this.details = details
   }
 }
 
@@ -24,25 +18,8 @@ async function parseResponse(res: Response) {
   try {
     return JSON.parse(text)
   } catch {
-    return { error: 'Unexpected response from backend.' }
+    return { error: 'Unexpected service response.' }
   }
-}
-
-export async function getXzroHealth(): Promise<XzroHealth> {
-  const res = await fetch('/api/xzro/health', { cache: 'no-store' })
-  const data = await parseResponse(res)
-
-  if (!res.ok) {
-    throw new XzroRequestError(
-      res.status === 401 || res.status === 403
-        ? 'Authentication failed.'
-        : 'Backend unavailable.',
-      res.status,
-      data,
-    )
-  }
-
-  return (data ?? {}) as XzroHealth
 }
 
 export async function runXzroCycle(
@@ -56,27 +33,11 @@ export async function runXzroCycle(
   const data = await parseResponse(res)
 
   if (!res.ok) {
-    const record =
-      data && typeof data === 'object' ? (data as Record<string, unknown>) : null
-    const detail =
-      record?.detail && typeof record.detail === 'object'
-        ? (record.detail as Record<string, unknown>)
-        : null
-    const backendMessage =
-      typeof detail?.message === 'string'
-        ? detail.message
-        : typeof record?.error === 'string'
-          ? record.error
-          : null
-
     throw new XzroRequestError(
-      res.status === 401 || res.status === 403
-        ? 'Authentication failed.'
-        : res.status === 408 || res.status === 504
-          ? 'Market scan timed out.'
-          : backendMessage || 'Backend rejected the request.',
+      res.status === 408 || res.status === 504
+        ? 'Market scan timed out.'
+        : 'The scan could not be completed.',
       res.status,
-      data,
     )
   }
 
@@ -85,8 +46,6 @@ export async function runXzroCycle(
 
 export function buildHyperliquidPayload(
   budget = 100,
-  includeRawBooks = false,
-  useFallback = true,
 ): XzroCycleRequest {
   return {
     venue: 'hyperliquid',
@@ -95,26 +54,15 @@ export function buildHyperliquidPayload(
     max_symbols_deep_analysis: 8,
     horizon_minutes: [30],
     portfolio_budget_usd: budget,
-    include_raw_books: includeRawBooks,
-    use_mock_on_error: useFallback,
-  }
-}
-
-export function buildSafeSamplePayload(budget = 100): XzroCycleRequest {
-  return {
-    venue: 'mock',
-    symbols: ['BTC-PERP', 'ETH-PERP', 'SOL-PERP'],
-    use_all_venue_symbols: false,
-    horizon_minutes: [30],
-    portfolio_budget_usd: budget,
+    include_raw_books: false,
+    use_mock_on_error: true,
   }
 }
 
 export function buildLocalSafeResult(): XzroCycleResponse {
   return {
     ok: true,
-    mode: 'safe_sample',
-    cycle_id: `safe_${Date.now().toString(36)}`,
+    cycle_id: `reference_${Date.now().toString(36)}`,
     elapsed_ms: 4,
     features: [
       {
@@ -150,7 +98,7 @@ export function buildLocalSafeResult(): XzroCycleResponse {
     ],
     scenario_evaluations: [
       {
-        candidate_id: 'safe_btc_30m',
+        candidate_id: 'reference_btc_30m',
         symbol: 'BTC-PERP',
         side: 'short',
         robust_score: 0,
@@ -160,7 +108,7 @@ export function buildLocalSafeResult(): XzroCycleResponse {
         reasons: ['net edge below minimum'],
       },
       {
-        candidate_id: 'safe_eth_30m',
+        candidate_id: 'reference_eth_30m',
         symbol: 'ETH-PERP',
         side: 'long',
         robust_score: 0,
@@ -170,7 +118,7 @@ export function buildLocalSafeResult(): XzroCycleResponse {
         reasons: ['cost-adjusted edge below minimum'],
       },
       {
-        candidate_id: 'safe_sol_30m',
+        candidate_id: 'reference_sol_30m',
         symbol: 'SOL-PERP',
         side: 'long',
         robust_score: 0.12,
@@ -182,14 +130,13 @@ export function buildLocalSafeResult(): XzroCycleResponse {
     ],
     portfolio_plan: {
       decision: 'no_trade',
-      llm_rationale: 'No candidate cleared the current cost and risk thresholds.',
     },
     portfolio_validation: {
       decision: 'no_trade',
       hard_failures: [],
-      soft_warnings: ['safe sample used'],
+      soft_warnings: [],
       approved_candidate_ids: [],
     },
-    warnings: ['Local safe sample loaded.'],
+    warnings: [],
   }
 }

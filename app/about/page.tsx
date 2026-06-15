@@ -15,12 +15,12 @@ const sections = [
     body: 'xZro scans venue state, produces strategy candidates, checks their expected edge, and returns a verified decision.',
   },
   {
-    title: 'What this deployment includes',
-    body: 'Static Fast Mode, authenticated backend access, Hyperliquid venue scans, safe sample data, and compact decision analysis.',
+    title: 'How decisions are formed',
+    body: 'Candidates are evaluated against expected edge, market costs, liquidity, and risk criteria.',
   },
   {
-    title: 'What is intentionally disabled',
-    body: 'Live execution, custody, and automated position management are outside this deployment.',
+    title: 'What users receive',
+    body: 'A concise decision summary, candidate set, gate results, and market features.',
   },
 ]
 
@@ -38,11 +38,11 @@ export default function AboutPage() {
       <section className="fade-in mx-auto max-w-[960px] px-4 py-16 sm:px-6 sm:py-24">
         <p className="text-xs uppercase tracking-[0.16em] text-accent">System</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-text-primary sm:text-5xl">
-          Strategy generation, separated from execution.
+          From market state to verified decision.
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-7 text-text-secondary">
-          xZro focuses on fast market scans and verified decisions. Live
-          execution is disabled.
+          xZro turns market data into a structured strategy decision through a
+          disciplined verification flow.
         </p>
 
         <div className="mt-14 divide-y divide-border-subtle border-y border-border-subtle">
@@ -57,7 +57,7 @@ export default function AboutPage() {
               <h2 className="text-sm font-medium text-text-primary">
                 {section.title}
               </h2>
-              <p className="max-w-xl text-sm leading-6 text-text-muted">
+              <p className="max-w-xl text-sm leading-6 text-text-secondary">
                 {section.body}
               </p>
             </div>

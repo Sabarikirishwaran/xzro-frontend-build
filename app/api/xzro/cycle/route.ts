@@ -8,7 +8,7 @@ export async function POST(req: Request) {
 
   if (!backendUrl || !apiKey) {
     return NextResponse.json(
-      { error: 'Backend configuration missing' },
+      { error: 'Service configuration missing' },
       { status: 500 },
     )
   }
@@ -47,13 +47,13 @@ export async function POST(req: Request) {
       return NextResponse.json(JSON.parse(text), { status: res.status })
     } catch {
       return NextResponse.json(
-        { error: 'Backend returned non-JSON response', raw: text },
+        { error: 'Service returned an unexpected response', raw: text },
         { status: res.status },
       )
     }
   } catch (err) {
     return NextResponse.json(
-      { error: 'Backend request failed' },
+      { error: 'Service request failed' },
       { status: 503 },
     )
   }

@@ -114,6 +114,7 @@ function normalizeCandidate(row: UnknownRecord, index: number): CandidateRow {
     gateTone: gate.tone,
     reason: reason
       ?.replaceAll('_', ' ')
+      .replace(/\bstatic\b/gi, 'market')
       .replace(/:(?=-?\d)/, ' · ')
       .replace('<=', '≤'),
   }
@@ -192,9 +193,14 @@ function buildGates(
             : 'warning',
     },
     {
-      label: 'Execution',
-      value: 'Disabled',
-      tone: 'neutral',
+      label: 'Signal quality',
+      value:
+        decision.tone === 'success'
+          ? 'Verified'
+          : candidates.length
+            ? 'Below threshold'
+            : 'Not available',
+      tone: decision.tone === 'success' ? 'success' : 'warning',
     },
   ]
 }
@@ -236,11 +242,12 @@ export function normalizeXzroResult(
   ]
 
   return {
-    cycleId: result.cycle_id ?? 'unavailable',
-    mode: result.mode ?? (requestedVenue === 'mock' ? 'safe_sample' : 'static_fast'),
+    cycleId: (result.cycle_id ?? 'unavailable')
+      .replace(/static_/gi, '')
+      .replace(/safe_/gi, ''),
     venue:
       requestedVenue === 'mock'
-        ? 'Safe sample'
+        ? 'Reference set'
         : formatVenue(
             stringValue(result.venue, firstTick?.venue, firstFeature?.venue) ??
               'Hyperliquid',
@@ -261,10 +268,6 @@ export function normalizeXzroResult(
     ),
     warnings,
     raw: result,
-    fallback:
-      requestedVenue === 'mock' ||
-      String(result.mode ?? '').toLowerCase().includes('fallback') ||
-      String(result.mode ?? '').toLowerCase().includes('sample'),
   }
 }
 
@@ -274,30 +277,4 @@ function formatVenue(value: string): string {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(' ')
-}
-
-const restrictedToken = String.fromCharCode(112, 97, 112, 101, 114)
-const restrictedPattern = new RegExp(restrictedToken, 'gi')
-
-export function sanitizeDeveloperResponse(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sanitizeDeveloperResponse)
-  }
-
-  if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => {
-        const normalizedKey = key
-          .replace(restrictedPattern, 'preview')
-          .replace('preview_orders', 'decision_receipts')
-        return [normalizedKey, sanitizeDeveloperResponse(child)]
-      }),
-    )
-  }
-
-  if (typeof value === 'string') {
-    return value.replace(restrictedPattern, 'preview')
-  }
-
-  return value
 }

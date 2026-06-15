@@ -30,8 +30,8 @@ const principles = [
     body: 'Spread, slippage buffer, and funding impact are considered.',
   },
   {
-    title: 'Execution disabled',
-    body: 'This deployment returns decisions only.',
+    title: 'Decision clarity',
+    body: 'Market context, candidate quality, and gate outcomes stay connected.',
   },
 ]
 
@@ -41,14 +41,11 @@ export default function LandingPage() {
       <section className="fade-in mx-auto max-w-[1200px] px-4 pb-20 pt-16 sm:px-6 sm:pt-24 lg:pb-28 lg:pt-32">
         <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
           <div>
-            <span className="inline-flex rounded-full border border-accent-border bg-accent-soft px-3 py-1.5 text-xs text-accent">
-              Static Fast Mode · Vercel-ready
-            </span>
-            <h1 className="mt-7 max-w-3xl text-balance text-[2.7rem] font-semibold leading-[1.03] tracking-[-0.045em] text-text-primary sm:text-6xl lg:text-[4.15rem]">
+            <h1 className="max-w-3xl text-balance text-[2.7rem] font-semibold leading-[1.03] tracking-[-0.045em] text-text-primary sm:text-6xl lg:text-[4.15rem]">
               Verifier-first strategy intelligence for crypto markets.
             </h1>
             <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-text-secondary sm:text-lg">
-              xZro scans live venue data, evaluates strategy candidates, and
+              xZro evaluates market data and strategy candidates, then
               returns a concise decision through cost and risk gates.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -99,7 +96,7 @@ export default function LandingPage() {
               Decision quality before action.
             </h2>
           </div>
-          <p className="max-w-md text-sm leading-6 text-text-muted">
+          <p className="max-w-md text-sm leading-6 text-text-secondary">
             A focused interface for market state, candidate quality, and gate
             outcomes.
           </p>
@@ -117,7 +114,7 @@ export default function LandingPage() {
               <h3 className="mt-5 text-base font-medium text-text-primary">
                 {item.title}
               </h3>
-              <p className="mt-2 max-w-sm text-sm leading-6 text-text-muted">
+              <p className="mt-2 max-w-sm text-sm leading-6 text-text-secondary">
                 {item.body}
               </p>
             </div>

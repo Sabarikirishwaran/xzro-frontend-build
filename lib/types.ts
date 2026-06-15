@@ -12,15 +12,6 @@ export type XzroCycleRequest = {
   use_mock_on_error?: boolean
 }
 
-export type XzroHealth = {
-  ok?: boolean
-  auth?: string
-  mode?: string
-  venue?: string
-  error?: string
-  [key: string]: unknown
-}
-
 export type XzroCycleResponse = {
   ok?: boolean
   mode?: string
@@ -44,8 +35,6 @@ export type XzroCycleResponse = {
   error?: string
   [key: string]: unknown
 }
-
-export type HealthState = 'checking' | 'online' | 'offline' | 'auth_error'
 
 export type DecisionTone = 'neutral' | 'success' | 'warning'
 
@@ -87,7 +76,6 @@ export type GateRow = {
 
 export type NormalizedResult = {
   cycleId: string
-  mode: string
   venue: string
   horizonMinutes: number
   runtimeMs?: number
@@ -99,5 +87,4 @@ export type NormalizedResult = {
   rationale?: string
   warnings: string[]
   raw: XzroCycleResponse
-  fallback: boolean
 }

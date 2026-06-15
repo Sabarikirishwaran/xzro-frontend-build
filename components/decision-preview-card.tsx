@@ -7,7 +7,6 @@ const rows = [
   ['Candidates', '8 scanned'],
   ['Cost gate', 'Passed'],
   ['Risk gate', 'No candidate selected'],
-  ['Mode', 'Static Fast'],
 ]
 
 export function DecisionPreviewCard() {
@@ -16,11 +15,11 @@ export function DecisionPreviewCard() {
       <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
         <div>
           <p className="text-sm font-medium text-text-primary">Decision preview</p>
-          <p className="mt-1 font-mono text-[11px] text-text-muted">
-            cycle_static_8f42a1
+          <p className="mt-1 font-mono text-[11px] text-text-secondary">
+            cycle_8f42a1
           </p>
         </div>
-        <DataBadge>Execution disabled</DataBadge>
+        <DataBadge tone="success">Decision ready</DataBadge>
       </div>
 
       <dl className="divide-y divide-white/[0.055] px-5">
@@ -29,7 +28,7 @@ export function DecisionPreviewCard() {
             key={label}
             className="grid grid-cols-[112px_1fr] gap-4 py-3 text-xs"
           >
-            <dt className="text-text-muted">{label}</dt>
+            <dt className="text-text-secondary">{label}</dt>
             <dd className="mono-number text-right text-text-secondary">
               {value}
             </dd>

@@ -1,4 +1,3 @@
-import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
     template: '%s | xZro',
   },
   description:
-    'xZro scans live venue data, evaluates strategy candidates, and returns a concise decision through cost and risk gates.',
+    'xZro evaluates market data, strategy candidates, and risk criteria to deliver concise market decisions.',
 }
 
 export const viewport: Viewport = {
@@ -35,7 +34,6 @@ export default function RootLayout({
     >
       <body className="bg-background text-text-primary antialiased">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )

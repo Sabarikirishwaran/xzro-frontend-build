@@ -6,7 +6,7 @@ export async function GET() {
 
   if (!backendUrl || !apiKey) {
     return NextResponse.json(
-      { error: 'Backend configuration missing' },
+      { error: 'Service configuration missing' },
       { status: 500 },
     )
   }
@@ -25,13 +25,13 @@ export async function GET() {
       return NextResponse.json(JSON.parse(text), { status: res.status })
     } catch {
       return NextResponse.json(
-        { error: 'Backend returned non-JSON response', raw: text },
+        { error: 'Service returned an unexpected response', raw: text },
         { status: res.status },
       )
     }
   } catch (err) {
     return NextResponse.json(
-      { error: 'Backend unavailable' },
+      { error: 'Service unavailable' },
       { status: 503 },
     )
   }
