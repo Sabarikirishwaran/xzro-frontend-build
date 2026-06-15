@@ -10,15 +10,17 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'xZro — Verifier-first AI strategy governor',
+  title: {
+    default: 'xZro | Verifier-first strategy intelligence',
+    template: '%s | xZro',
+  },
   description:
-    'xZro scans perp markets, asks an LLM to propose conditional strategies, then lets formal checks, cost/risk gates, and paper execution decide whether anything is worth trading.',
-  generator: 'v0.app',
+    'xZro scans live venue data, evaluates strategy candidates, and returns a concise decision through cost and risk gates.',
 }
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: '#0a0a0b',
+  themeColor: '#050507',
 }
 
 export default function RootLayout({
@@ -29,9 +31,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="font-sans antialiased bg-background text-foreground">
+      <body className="bg-background text-text-primary antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

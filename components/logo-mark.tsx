@@ -7,18 +7,18 @@ type LogoMarkProps = {
 
 export function LogoMark({ className, showWordmark = true }: LogoMarkProps) {
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
+    <span className={cn('inline-flex items-center gap-2.5', className)}>
       <span
-        className="grid size-8 place-items-center rounded-xl border border-xborder-strong bg-xpanel-2 text-xaccent-strong x-glow"
+        className="grid size-7 place-items-center rounded-lg border border-accent-border bg-accent-soft text-accent"
         aria-hidden="true"
       >
         <svg
-          width="18"
-          height="18"
+          width="15"
+          height="15"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.8"
+          strokeWidth="1.7"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
@@ -26,7 +26,7 @@ export function LogoMark({ className, showWordmark = true }: LogoMarkProps) {
         </svg>
       </span>
       {showWordmark && (
-        <span className="font-heading text-lg font-bold tracking-tight text-xtext">
+        <span className="text-[15px] font-semibold tracking-[-0.02em] text-text-primary">
           xZro
         </span>
       )}

@@ -1,0 +1,57 @@
+import { formatDuration, shortId } from '@/lib/format'
+import type { NormalizedResult } from '@/lib/types'
+import { DataBadge, Panel } from './ui'
+
+export function DecisionSummary({ result }: { result: NormalizedResult }) {
+  return (
+    <Panel className="overflow-hidden">
+      <div className="flex flex-col gap-5 border-b border-border-subtle p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs uppercase tracking-[0.14em] text-text-muted">
+              Verified decision
+            </p>
+            {result.fallback && (
+              <DataBadge tone="warning">Fallback sample active</DataBadge>
+            )}
+          </div>
+          <h2 className="mt-3 text-2xl font-medium tracking-[-0.03em] text-text-primary">
+            {result.decision.label}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-text-secondary">
+            {result.decision.caption}
+          </p>
+          {result.rationale && (
+            <p className="mt-3 max-w-xl text-xs leading-5 text-text-muted">
+              {result.rationale}
+            </p>
+          )}
+        </div>
+        <DataBadge tone={result.decision.tone}>Decision ready</DataBadge>
+      </div>
+
+      <dl className="grid grid-cols-2 divide-x divide-y divide-border-subtle sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        <Metric label="Cycle" value={shortId(result.cycleId)} />
+        <Metric label="Venue" value={result.venue} />
+        <Metric label="Horizon" value={`${result.horizonMinutes}m`} />
+        <Metric label="Runtime" value={formatDuration(result.runtimeMs)} />
+        <Metric label="Candidates" value={String(result.candidates.length)} />
+        <Metric
+          label="Selected"
+          value={result.selectedCandidate?.symbol ?? 'None'}
+        />
+      </dl>
+    </Panel>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 px-4 py-4">
+      <dt className="text-[11px] text-text-muted">{label}</dt>
+      <dd className="mono-number mt-1 truncate text-xs text-text-secondary">
+        {value}
+      </dd>
+    </div>
+  )
+}
