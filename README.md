@@ -18,16 +18,6 @@ Install dependencies and start the development server:
 pnpm install
 pnpm dev
 ```
-
-Create `.env.local` with server-only backend configuration:
-
-```env
-XZRO_BACKEND_URL=https://your-backend.example
-XZRO_BACKEND_API_KEY=your-secret-key
-```
-
-Browser requests must use the internal `/api/xzro/*` routes.
-
 ## Validation
 
 ```bash
