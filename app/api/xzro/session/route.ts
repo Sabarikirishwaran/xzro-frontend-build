@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     return jsonNoStore(
       {
         error: 'Service temporarily unavailable.',
-        code: 'service_unavailable',
+        code: 'server_config_invalid',
       },
       { status: 503 },
     )
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       return jsonNoStore(
         {
           error: 'Service temporarily unavailable.',
-          code: 'service_unavailable',
+          code: 'server_config_missing',
         },
         { status: 503 },
       )

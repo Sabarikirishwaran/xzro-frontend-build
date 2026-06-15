@@ -28,6 +28,9 @@ Required environment variables:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 
+The Vercel KV aliases `KV_REST_API_URL` and `KV_REST_API_TOKEN` are also
+accepted in place of the Upstash names.
+
 Optional environment variable:
 
 - `FRONTEND_DEMO_KEY` - enables the dashboard access-code gate. Use a random

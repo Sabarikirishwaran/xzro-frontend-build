@@ -7,7 +7,8 @@ import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 
 const SESSION_TTL_SECONDS = 8 * 60 * 60
-const RATE_LIMIT_TIMEOUT_MS = 2_500
+const REDIS_REQUEST_TIMEOUT_MS = 3_000
+const RATE_LIMIT_TIMEOUT_MS = 7_000
 const MINIMUM_DEMO_KEY_LENGTH = 24
 
 const COOKIE_NAME =
@@ -32,7 +33,82 @@ type SessionPayload = {
   id: string
 }
 
-let rateLimiters: RateLimiters | null = null
+type ProtectionUnavailableCode =
+  | 'rate_limit_config_invalid'
+  | 'rate_limit_config_missing'
+  | 'rate_limit_unavailable'
+  | 'server_config_invalid'
+  | 'server_config_missing'
+
+type RateLimitConfiguration =
+  | {
+      status: 'ready'
+      token: string
+      url: string
+    }
+  | {
+      status: 'invalid' | 'missing'
+    }
+
+let rateLimiters: RateLimiters | undefined
+
+function readServerEnv(name: string, aliases: string[] = []) {
+  for (const candidate of [name, ...aliases]) {
+    const rawValue = process.env[candidate]
+    if (!rawValue) continue
+
+    let value = rawValue.trim()
+    const assignmentPrefix = `${candidate}=`
+
+    if (value.startsWith(assignmentPrefix)) {
+      value = value.slice(assignmentPrefix.length).trim()
+    }
+
+    const first = value.at(0)
+    const last = value.at(-1)
+    if (
+      value.length >= 2 &&
+      (first === '"' || first === "'") &&
+      first === last
+    ) {
+      value = value.slice(1, -1).trim()
+    }
+
+    if (value) return value
+  }
+
+  return null
+}
+
+function getDemoKey() {
+  return readServerEnv('FRONTEND_DEMO_KEY')
+}
+
+function getRateLimitConfiguration(): RateLimitConfiguration {
+  const url = readServerEnv('UPSTASH_REDIS_REST_URL', [
+    'KV_REST_API_URL',
+  ])
+  const token = readServerEnv('UPSTASH_REDIS_REST_TOKEN', [
+    'KV_REST_API_TOKEN',
+  ])
+
+  if (!url || !token) return { status: 'missing' }
+
+  try {
+    const parsedUrl = new URL(url)
+    if (
+      parsedUrl.protocol !== 'https:' ||
+      parsedUrl.username ||
+      parsedUrl.password
+    ) {
+      return { status: 'invalid' }
+    }
+  } catch {
+    return { status: 'invalid' }
+  }
+
+  return { status: 'ready', token, url }
+}
 
 export function jsonNoStore(
   body: unknown,
@@ -49,11 +125,11 @@ export function jsonNoStore(
 }
 
 export function isDemoAccessRequired() {
-  return Boolean(process.env.FRONTEND_DEMO_KEY)
+  return Boolean(getDemoKey())
 }
 
 export function hasValidDemoConfiguration() {
-  const key = process.env.FRONTEND_DEMO_KEY
+  const key = getDemoKey()
   return !key || key.length >= MINIMUM_DEMO_KEY_LENGTH
 }
 
@@ -93,7 +169,7 @@ export function getClientIp(req: Request) {
 }
 
 function getIdentifierSecret() {
-  return process.env.XZRO_BACKEND_API_KEY
+  return readServerEnv('XZRO_BACKEND_API_KEY')
 }
 
 function hashIdentifier(scope: string, value: string) {
@@ -105,17 +181,17 @@ function hashIdentifier(scope: string, value: string) {
     .digest('base64url')
 }
 
-function createRateLimiters() {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
-
-  if (!url || !token) return null
-
+function createRateLimiters(
+  configuration: Extract<RateLimitConfiguration, { status: 'ready' }>,
+) {
   const redis = new Redis({
-    url,
-    token,
-    retry: false,
-    signal: () => AbortSignal.timeout(RATE_LIMIT_TIMEOUT_MS),
+    url: configuration.url,
+    token: configuration.token,
+    retry: {
+      retries: 1,
+      backoff: () => 100,
+    },
+    signal: () => AbortSignal.timeout(REDIS_REQUEST_TIMEOUT_MS),
   })
 
   const build = (
@@ -150,8 +226,10 @@ function createRateLimiters() {
   } satisfies RateLimiters
 }
 
-function getRateLimiters() {
-  if (!rateLimiters) rateLimiters = createRateLimiters()
+function getRateLimiters(
+  configuration: Extract<RateLimitConfiguration, { status: 'ready' }>,
+) {
+  if (!rateLimiters) rateLimiters = createRateLimiters(configuration)
   return rateLimiters
 }
 
@@ -197,11 +275,13 @@ function rateLimitedResponse(limit: number, remaining: number, reset: number) {
   )
 }
 
-function protectionUnavailableResponse() {
+function protectionUnavailableResponse(code: ProtectionUnavailableCode) {
+  console.error(`[xzro-api] ${code}`)
+
   return jsonNoStore(
     {
       error: 'Service temporarily unavailable.',
-      code: 'service_unavailable',
+      code,
     },
     { status: 503 },
   )
@@ -220,13 +300,22 @@ async function enforceLimits(
   sessionId?: string,
 ) {
   const ip = getClientIp(req)
-  const limiters = getRateLimiters()
 
   if (!ip) return invalidSourceResponse()
-  if (!limiters || !getIdentifierSecret()) {
-    return protectionUnavailableResponse()
+
+  const configuration = getRateLimitConfiguration()
+  if (configuration.status !== 'ready') {
+    return protectionUnavailableResponse(
+      configuration.status === 'missing'
+        ? 'rate_limit_config_missing'
+        : 'rate_limit_config_invalid',
+    )
+  }
+  if (!getIdentifierSecret()) {
+    return protectionUnavailableResponse('server_config_missing')
   }
 
+  const limiters = getRateLimiters(configuration)
   const group = limiters[groupName]
 
   try {
@@ -257,13 +346,13 @@ async function enforceLimits(
 
     return null
   } catch {
-    return protectionUnavailableResponse()
+    return protectionUnavailableResponse('rate_limit_unavailable')
   }
 }
 
 function sessionSigningKey() {
-  const demoKey = process.env.FRONTEND_DEMO_KEY
-  const backendKey = process.env.XZRO_BACKEND_API_KEY
+  const demoKey = getDemoKey()
+  const backendKey = getIdentifierSecret()
   if (!demoKey || !backendKey) return null
 
   return createHash('sha256')
@@ -284,7 +373,7 @@ function safeEqual(left: string, right: string) {
 }
 
 export function verifyDemoCode(providedCode: string) {
-  const expectedCode = process.env.FRONTEND_DEMO_KEY
+  const expectedCode = getDemoKey()
   if (!expectedCode || expectedCode.length < MINIMUM_DEMO_KEY_LENGTH) {
     return false
   }
@@ -386,7 +475,7 @@ async function protectAuthenticatedEndpoint(
   }
 
   if (!hasValidDemoConfiguration()) {
-    return protectionUnavailableResponse()
+    return protectionUnavailableResponse('server_config_invalid')
   }
 
   const rateLimited = await enforceLimits(req, group)
@@ -403,10 +492,19 @@ async function protectAuthenticatedEndpoint(
 
   if (!session.id) return null
 
-  const limiters = getRateLimiters()
-  if (!limiters || !getIdentifierSecret()) {
-    return protectionUnavailableResponse()
+  const configuration = getRateLimitConfiguration()
+  if (configuration.status !== 'ready') {
+    return protectionUnavailableResponse(
+      configuration.status === 'missing'
+        ? 'rate_limit_config_missing'
+        : 'rate_limit_config_invalid',
+    )
   }
+  if (!getIdentifierSecret()) {
+    return protectionUnavailableResponse('server_config_missing')
+  }
+
+  const limiters = getRateLimiters(configuration)
 
   try {
     const limiter = limiters[group].session
@@ -421,7 +519,7 @@ async function protectAuthenticatedEndpoint(
       ? null
       : rateLimitedResponse(result.limit, result.remaining, result.reset)
   } catch {
-    return protectionUnavailableResponse()
+    return protectionUnavailableResponse('rate_limit_unavailable')
   }
 }
 
