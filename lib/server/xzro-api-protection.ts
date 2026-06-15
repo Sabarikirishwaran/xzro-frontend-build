@@ -9,12 +9,12 @@ import { NextRequest, NextResponse } from 'next/server'
 const SESSION_TTL_SECONDS = 8 * 60 * 60
 const REDIS_REQUEST_TIMEOUT_MS = 3_000
 const RATE_LIMIT_TIMEOUT_MS = 7_000
-const MINIMUM_DEMO_KEY_LENGTH = 24
+const MINIMUM_SESSION_SECRET_LENGTH = 24
 
 const COOKIE_NAME =
   process.env.NODE_ENV === 'production'
-    ? '__Host-xzro-demo-session'
-    : 'xzro-demo-session'
+    ? '__Host-xzro-session'
+    : 'xzro-session'
 
 type LimitGroup = {
   global: Ratelimit
@@ -23,7 +23,6 @@ type LimitGroup = {
 }
 
 type RateLimiters = {
-  access: LimitGroup
   cycle: LimitGroup
   health: LimitGroup
 }
@@ -80,7 +79,7 @@ function readServerEnv(name: string, aliases: string[] = []) {
   return null
 }
 
-function getDemoKey() {
+function getSessionSecret() {
   return readServerEnv('FRONTEND_DEMO_KEY')
 }
 
@@ -124,13 +123,9 @@ export function jsonNoStore(
   return NextResponse.json(body, { ...init, headers })
 }
 
-export function isDemoAccessRequired() {
-  return Boolean(getDemoKey())
-}
-
-export function hasValidDemoConfiguration() {
-  const key = getDemoKey()
-  return !key || key.length >= MINIMUM_DEMO_KEY_LENGTH
+export function hasValidSessionConfiguration() {
+  const key = getSessionSecret()
+  return Boolean(key && key.length >= MINIMUM_SESSION_SECRET_LENGTH)
 }
 
 export function isSameOriginRequest(req: Request) {
@@ -209,10 +204,6 @@ function createRateLimiters(
     })
 
   return {
-    access: {
-      global: build('xzro:access:global', 100, '15 m'),
-      ip: build('xzro:access:ip', 5, '15 m'),
-    },
     cycle: {
       global: build('xzro:cycle:global', 120, '60 s'),
       ip: build('xzro:cycle:ip', 8, '60 s'),
@@ -351,12 +342,12 @@ async function enforceLimits(
 }
 
 function sessionSigningKey() {
-  const demoKey = getDemoKey()
+  const sessionSecret = getSessionSecret()
   const backendKey = getIdentifierSecret()
-  if (!demoKey || !backendKey) return null
+  if (!sessionSecret || !backendKey) return null
 
   return createHash('sha256')
-    .update(`xzro-demo-session:${demoKey}:${backendKey}`)
+    .update(`xzro-session:${sessionSecret}:${backendKey}`)
     .digest()
 }
 
@@ -372,16 +363,7 @@ function safeEqual(left: string, right: string) {
   return timingSafeEqual(leftHash, rightHash)
 }
 
-export function verifyDemoCode(providedCode: string) {
-  const expectedCode = getDemoKey()
-  if (!expectedCode || expectedCode.length < MINIMUM_DEMO_KEY_LENGTH) {
-    return false
-  }
-
-  return safeEqual(providedCode, expectedCode)
-}
-
-export function createDemoSession() {
+export function createBrowserSession() {
   const payload: SessionPayload = {
     expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000,
     id: randomBytes(24).toString('base64url'),
@@ -397,11 +379,7 @@ export function createDemoSession() {
   }
 }
 
-export function readDemoSession(req: NextRequest) {
-  if (!isDemoAccessRequired()) {
-    return { authenticated: true, id: null }
-  }
-
+export function readBrowserSession(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value
   if (!token) return { authenticated: false, id: null }
 
@@ -436,9 +414,9 @@ export function readDemoSession(req: NextRequest) {
   }
 }
 
-export function setDemoSessionCookie(
+export function setBrowserSessionCookie(
   response: NextResponse,
-  session: ReturnType<typeof createDemoSession>,
+  session: ReturnType<typeof createBrowserSession>,
 ) {
   if (!session) return
 
@@ -451,21 +429,6 @@ export function setDemoSessionCookie(
   })
 }
 
-export function clearDemoSessionCookie(response: NextResponse) {
-  response.cookies.set(COOKIE_NAME, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
-    expires: new Date(0),
-  })
-}
-
-export async function protectAccessAttempt(req: NextRequest) {
-  if (!isSameOriginRequest(req)) return invalidSourceResponse()
-  return enforceLimits(req, 'access')
-}
-
 async function protectAuthenticatedEndpoint(
   req: NextRequest,
   group: 'cycle' | 'health',
@@ -474,14 +437,14 @@ async function protectAuthenticatedEndpoint(
     return invalidSourceResponse()
   }
 
-  if (!hasValidDemoConfiguration()) {
+  if (!hasValidSessionConfiguration()) {
     return protectionUnavailableResponse('server_config_invalid')
   }
 
   const rateLimited = await enforceLimits(req, group)
   if (rateLimited) return rateLimited
 
-  const session = readDemoSession(req)
+  const session = readBrowserSession(req)
 
   if (!session.authenticated) {
     return jsonNoStore(

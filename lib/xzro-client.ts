@@ -16,13 +16,11 @@ type ApiEnvelope = {
   authenticated?: boolean
   code?: string
   error?: string
-  required?: boolean
   [key: string]: unknown
 }
 
 export type XzroAccessStatus = {
   authenticated: boolean
-  required: boolean
 }
 
 async function parseResponse(res: Response): Promise<ApiEnvelope | null> {
@@ -82,35 +80,6 @@ export async function getXzroAccessStatus(): Promise<XzroAccessStatus> {
 
   return {
     authenticated: data?.authenticated === true,
-    required: data?.required === true,
-  }
-}
-
-export async function createXzroSession(
-  accessCode: string,
-): Promise<XzroAccessStatus> {
-  const res = await fetch('/api/xzro/session', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ accessCode }),
-  })
-  const data = await parseResponse(res)
-
-  if (!res.ok) {
-    throw new XzroRequestError(
-      'Access could not be verified.',
-      res.status,
-      data?.code,
-    )
-  }
-
-  return {
-    authenticated: data?.authenticated === true,
-    required: data?.required === true,
   }
 }
 

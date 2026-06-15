@@ -27,14 +27,11 @@ Required environment variables:
 - `XZRO_BACKEND_API_KEY`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+- `FRONTEND_DEMO_KEY` - signs short-lived browser sessions automatically. Use
+  a random value of at least 24 characters. It is never sent to the browser.
 
 The Vercel KV aliases `KV_REST_API_URL` and `KV_REST_API_TOKEN` are also
 accepted in place of the Upstash names.
-
-Optional environment variable:
-
-- `FRONTEND_DEMO_KEY` - enables the dashboard access-code gate. Use a random
-  value of at least 24 characters.
 
 Never use the `NEXT_PUBLIC_` prefix for these values.
 
@@ -42,9 +39,9 @@ Never use the `NEXT_PUBLIC_` prefix for these values.
 
 Public API requests are constrained to a fixed scan configuration, protected
 by per-client and global Upstash limits, and forwarded with the private service
-credential only from server code. When demo access is enabled, the submitted
-code is exchanged for a signed, short-lived HttpOnly cookie and is not stored
-in browser storage.
+credential only from server code. The server automatically issues a signed,
+short-lived HttpOnly session cookie; the signing secret is never sent to or
+stored by browser code.
 
 Production client-IP enforcement trusts only Vercel's protected
 `x-vercel-forwarded-for` header and fails closed outside that environment.

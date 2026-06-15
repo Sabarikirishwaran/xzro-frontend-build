@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { CandidateTable } from './candidate-table'
 import { DecisionSummary } from './decision-summary'
 import {
-  AccessState,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -15,7 +14,6 @@ import { ScanControlPanel } from './scan-control-panel'
 import { normalizeXzroResult } from '@/lib/normalize-xzro'
 import {
   buildLocalSafeResult,
-  createXzroSession,
   getXzroAccessStatus,
   runXzroCycle,
   XzroRequestError,
@@ -34,7 +32,7 @@ type StoredResult = {
   timestamp: string
 }
 
-type AccessStateValue = 'checking' | 'granted' | 'required' | 'unavailable'
+type AccessStateValue = 'checking' | 'granted' | 'unavailable'
 
 export function DashboardConsole() {
   const [budget, setBudget] = useState(100)
@@ -43,9 +41,6 @@ export function DashboardConsole() {
   const [result, setResult] = useState<NormalizedResult | null>(null)
   const [accessState, setAccessState] =
     useState<AccessStateValue>('checking')
-  const [accessCode, setAccessCode] = useState('')
-  const [accessError, setAccessError] = useState<string | null>(null)
-  const [accessLoading, setAccessLoading] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -64,9 +59,7 @@ export function DashboardConsole() {
 
     try {
       const status = await getXzroAccessStatus()
-      setAccessState(
-        status.required && !status.authenticated ? 'required' : 'granted',
-      )
+      setAccessState(status.authenticated ? 'granted' : 'unavailable')
     } catch {
       setAccessState('unavailable')
     }
@@ -116,18 +109,28 @@ export function DashboardConsole() {
     setScanError(null)
 
     try {
-      const response = await runXzroCycle(budget)
+      let response: XzroCycleResponse
+
+      try {
+        response = await runXzroCycle(budget)
+      } catch (error) {
+        if (
+          !(error instanceof XzroRequestError) ||
+          error.code !== 'access_required'
+        ) {
+          throw error
+        }
+
+        const status = await getXzroAccessStatus()
+        if (!status.authenticated) throw error
+        response = await runXzroCycle(budget)
+      }
+
       commitResult(response, 'hyperliquid')
     } catch (error) {
       setRunState('idle')
 
       if (error instanceof XzroRequestError) {
-        if (error.code === 'access_required') {
-          setAccessState('required')
-          setAccessCode('')
-          return
-        }
-
         if (error.code === 'rate_limited') {
           setScanError('Request limit reached. Please wait before trying again.')
           return
@@ -142,30 +145,6 @@ export function DashboardConsole() {
       commitResult(buildLocalSafeResult(), 'mock')
     }
   }, [accessState, budget, commitResult])
-
-  const submitAccessCode = useCallback(async () => {
-    if (!accessCode || accessLoading) return
-
-    setAccessLoading(true)
-    setAccessError(null)
-
-    try {
-      const status = await createXzroSession(accessCode)
-      setAccessCode('')
-      setAccessState(status.authenticated ? 'granted' : 'required')
-    } catch (error) {
-      if (
-        error instanceof XzroRequestError &&
-        error.code === 'rate_limited'
-      ) {
-        setAccessError('Too many attempts. Please wait before trying again.')
-      } else {
-        setAccessError('The access code could not be verified.')
-      }
-    } finally {
-      setAccessLoading(false)
-    }
-  }, [accessCode, accessLoading])
 
   return (
     <div className="fade-in mx-auto max-w-[1200px] px-4 py-10 sm:px-6 sm:py-14">
@@ -199,14 +178,6 @@ export function DashboardConsole() {
             <ErrorState
               message="The strategy console is temporarily unavailable."
               onRetry={refreshAccessStatus}
-            />
-          ) : accessState === 'required' ? (
-            <AccessState
-              accessCode={accessCode}
-              error={accessError}
-              loading={accessLoading}
-              onAccessCodeChange={setAccessCode}
-              onSubmit={submitAccessCode}
             />
           ) : accessState === 'checking' ? (
             <LoadingState slow={false} />
