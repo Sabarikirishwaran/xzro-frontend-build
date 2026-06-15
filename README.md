@@ -26,7 +26,7 @@ XZRO_BACKEND_URL=https://your-backend.example
 XZRO_BACKEND_API_KEY=your-secret-key
 ```
 
-Do not prefix the API key with `NEXT_PUBLIC_`. Browser requests must use the internal `/api/xzro/*` routes.
+Browser requests must use the internal `/api/xzro/*` routes.
 
 ## Validation
 
