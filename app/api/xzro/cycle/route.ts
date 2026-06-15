@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextRequest } from 'next/server'
 import {
   jsonNoStore,
@@ -14,6 +15,12 @@ const BACKEND_TIMEOUT_MS = 240_000
 
 type ScanRequest = {
   portfolio_budget_usd?: unknown
+}
+
+type UnknownRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
 function getBackendConfig() {
@@ -102,27 +109,190 @@ async function readUpstreamJson(res: Response) {
   return JSON.parse(text) as unknown
 }
 
-function sanitizeResponse(value: unknown, depth = 0): unknown {
-  if (depth > 12) return null
-  if (Array.isArray(value)) {
-    return value.slice(0, 2_000).map((item) => sanitizeResponse(item, depth + 1))
+function finiteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined
+}
+
+function firstFiniteNumber(...values: unknown[]) {
+  return values.map(finiteNumber).find((value) => value !== undefined)
+}
+
+function safeSymbol(value: unknown) {
+  if (typeof value !== 'string') return 'UNKNOWN'
+  const normalized = value.trim().toUpperCase()
+  return /^[A-Z0-9][A-Z0-9._/-]{0,31}$/.test(normalized)
+    ? normalized
+    : 'UNKNOWN'
+}
+
+function safeSide(value: unknown) {
+  const normalized = String(value ?? '').toLowerCase()
+  return ['long', 'short', 'flat'].includes(normalized)
+    ? normalized
+    : 'flat'
+}
+
+function safeCandidateDecision(value: unknown) {
+  const normalized = String(value ?? '').toLowerCase()
+  if (
+    ['pass', 'passed', 'accept', 'accepted', 'approved', 'selected', 'trade']
+      .includes(normalized)
+  ) {
+    return 'approved'
   }
-  if (!value || typeof value !== 'object') return value
-
-  const output: Record<string, unknown> = {}
-
-  for (const [key, item] of Object.entries(value)) {
-    if (
-      /(?:authorization|api[_-]?key|access[_-]?token|secret|password|raw[_-]?books?)/i.test(
-        key,
-      )
-    ) {
-      continue
-    }
-    output[key] = sanitizeResponse(item, depth + 1)
+  if (['watch', 'watchlist', 'watchlisted'].includes(normalized)) {
+    return 'watchlist'
   }
+  return 'reject'
+}
 
-  return output
+function safePortfolioDecision(value: unknown) {
+  const normalized = String(value ?? '')
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+
+  if (
+    ['selected', 'accepted', 'approved', 'trade', 'candidate_selected']
+      .includes(normalized)
+  ) {
+    return 'selected'
+  }
+  if (['watch', 'watchlist', 'watchlisted'].includes(normalized)) {
+    return 'watchlist'
+  }
+  return 'no_trade'
+}
+
+function canonicalReason(row: UnknownRecord) {
+  const reasonValues = Array.isArray(row.reasons)
+    ? row.reasons
+    : [row.reason, row.rationale, row.rejection_reason]
+  const reason = reasonValues
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+
+  if (reason.includes('flat') || safeSide(row.side ?? row.action) === 'flat') {
+    return 'market direction is flat'
+  }
+  if (reason.includes('liquidity')) return 'liquidity threshold not met'
+  if (reason.includes('risk') || reason.includes('survival')) {
+    return 'risk threshold not met'
+  }
+  if (reason.includes('cost')) return 'cost-adjusted edge below minimum'
+  if (reason.includes('edge') || reason.includes('minimum')) {
+    return 'net edge below minimum'
+  }
+  return 'candidate did not pass verification'
+}
+
+function sanitizeCandidate(value: unknown, index: number) {
+  if (!isRecord(value)) return null
+
+  const decision = safeCandidateDecision(value.decision ?? value.gate)
+
+  return {
+    candidate_id: `candidate-${index + 1}`,
+    symbol: safeSymbol(value.symbol ?? value.instrument),
+    side: safeSide(value.side ?? value.action),
+    decision,
+    reasons: decision === 'approved' ? [] : [canonicalReason(value)],
+    score: firstFiniteNumber(
+      value.score,
+      value.entry_score,
+      value.signal_score,
+    ),
+    expected_net_return_pct: firstFiniteNumber(
+      value.expected_net_return_pct,
+      value.expectedNetReturnPct,
+    ),
+    estimated_cost_pct: firstFiniteNumber(
+      value.estimated_cost_pct,
+      value.cost_pct,
+    ),
+    risk_score: firstFiniteNumber(
+      value.risk_score,
+      value.riskScore,
+      value.robust_score,
+    ),
+    horizon_minutes: 30,
+  }
+}
+
+function sanitizeFeature(value: unknown) {
+  if (!isRecord(value)) return null
+
+  return {
+    symbol: safeSymbol(value.symbol),
+    mid: finiteNumber(value.mid),
+    spread_pct: finiteNumber(value.spread_pct),
+    funding_rate: finiteNumber(value.funding_rate),
+    order_book_imbalance_l1: finiteNumber(value.order_book_imbalance_l1),
+    order_book_imbalance_l5: finiteNumber(value.order_book_imbalance_l5),
+    realized_vol_1m_pct: firstFiniteNumber(
+      value.realized_vol_1m_pct,
+      value.realized_vol_proxy_pct,
+    ),
+    liquidity_score: finiteNumber(value.liquidity_score),
+  }
+}
+
+function firstRecordArray(data: UnknownRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = data[key]
+    if (Array.isArray(value) && value.some(isRecord)) return value
+  }
+  return []
+}
+
+function sanitizeCycleResponse(value: unknown) {
+  if (!isRecord(value)) throw new Error('Invalid response')
+
+  const plan = isRecord(value.portfolio_plan) ? value.portfolio_plan : {}
+  const validation = isRecord(value.portfolio_validation)
+    ? value.portfolio_validation
+    : {}
+  const candidates = firstRecordArray(value, [
+    'scenario_evaluations',
+    'candidates',
+    'candidates_generated',
+    'templates',
+  ])
+    .slice(0, 64)
+    .map(sanitizeCandidate)
+    .filter((item) => item !== null)
+  const features = (Array.isArray(value.features) ? value.features : [])
+    .slice(0, 64)
+    .map(sanitizeFeature)
+    .filter((item) => item !== null)
+  const decision = safePortfolioDecision(
+    plan.decision ?? plan.action ?? validation.decision,
+  )
+  const hasHardFailure =
+    Array.isArray(validation.hard_failures) &&
+    validation.hard_failures.length > 0
+
+  return {
+    ok: value.ok === true,
+    cycle_id: `cycle_${randomUUID().replaceAll('-', '').slice(0, 12)}`,
+    runtime_ms: firstFiniteNumber(value.runtime_ms, value.elapsed_ms),
+    venue: 'hyperliquid',
+    selected_horizon_minutes: 30,
+    features,
+    scenario_evaluations: candidates,
+    portfolio_plan: { decision },
+    portfolio_validation: {
+      decision,
+      hard_failures: hasHardFailure ? ['verification_failed'] : [],
+      soft_warnings: [],
+      approved_candidate_ids: candidates
+        .filter((candidate) => candidate.decision === 'approved')
+        .map((candidate) => candidate.candidate_id),
+    },
+    warnings: [],
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -191,9 +361,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await readUpstreamJson(res)
-    if (!data || typeof data !== 'object') throw new Error('Invalid response')
-
-    return jsonNoStore(sanitizeResponse(data))
+    return jsonNoStore(sanitizeCycleResponse(data))
   } catch (error) {
     const timedOut =
       error instanceof Error &&
